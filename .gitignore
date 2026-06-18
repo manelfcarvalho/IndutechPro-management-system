@@ -1,0 +1,42 @@
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# Application build artifacts
+build/
+dist/
+
+# Local operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local secrets/config
+.env
+.env.*
+!.env.example
+
+# Local application data
+database/*.db
+database/*.db-wal
+database/*.db-shm
+backups/*.db
+
+# Generated/customer files
+assets/components/
+assets/datasheets/
+*.log
+*.xlsx
+*.xls
+*.pdf
