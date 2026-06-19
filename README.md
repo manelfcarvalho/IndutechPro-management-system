@@ -4,19 +4,6 @@ Aplicacao desktop para gestao de reparacoes, clientes, stock, folha de obra/PDF,
 
 O projeto foi organizado para uso real em empresa: o codigo pode evoluir sem obrigar a recriar a base de dados ja existente.
 
-## Aviso Importante
-
-Nao apagues estes ficheiros/pastas sem backup:
-
-- `database/indutechpro.db`
-- `database/indutechpro.db-wal`
-- `database/indutechpro.db-shm`
-- `backups/`
-- `assets/components/`
-- `assets/datasheets/`
-- `dist/Indutechpro.exe`, se for o executavel usado pela empresa
-
-Estes ficheiros sao dados locais/artefactos gerados e nao devem ser publicados no GitHub.
 
 ## Estrutura
 
