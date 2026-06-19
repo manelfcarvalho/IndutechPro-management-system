@@ -36,6 +36,7 @@ backups/*.db
 # Generated/customer files
 assets/components/
 assets/datasheets/
+test_outputs/
 *.log
 *.xlsx
 *.xls

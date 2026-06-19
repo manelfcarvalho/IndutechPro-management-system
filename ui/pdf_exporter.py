@@ -10,9 +10,39 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
 from datetime import datetime
 import os
 from ui.utils import resource_path
+
+
+def _calculate_items_table_widths(parts_list: list, available_width_pt: float) -> list:
+    """Calculate item table widths, expanding the code column for the longest code."""
+    qty_width = 34.0
+    unit_price_width = 70.0
+    total_width = 70.0
+    min_code_width = 60.0
+    min_description_width = 145.0
+
+    max_code_width = max(
+        min_code_width,
+        available_width_pt - min_description_width - qty_width - unit_price_width - total_width,
+    )
+
+    code_values = ["Codigo"]
+    code_values.extend(str(part.get("code", "")) for part in parts_list)
+
+    code_width = min_code_width
+    for code in code_values:
+        font_name = "Helvetica-Bold" if code == "Codigo" else "Helvetica"
+        font_size = 10 if code == "Codigo" else 9
+        measured_width = pdfmetrics.stringWidth(code, font_name, font_size) + 18.0
+        code_width = max(code_width, measured_width)
+
+    code_width = min(code_width, max_code_width)
+    description_width = available_width_pt - code_width - qty_width - unit_price_width - total_width
+
+    return [code_width, description_width, qty_width, unit_price_width, total_width]
 
 
 def format_currency(value: float) -> str:
@@ -422,9 +452,10 @@ def generate_repair_pdf(repair_data: dict, filename: str, db_manager=None) -> bo
         
         # Create Items Table
         if parts_list:
-            # Exact column widths in points: [Code, Description, Qty, Unit Price, Total]
-            # Total = 515 pts
-            col_widths = [60, 255, 40, 80, 80]
+            # Dynamic column widths in points: [Code, Description, Qty, Unit Price, Total]
+            # The code column expands to fit the longest code in this repair, while
+            # the last three numeric columns stay compact.
+            col_widths = _calculate_items_table_widths(parts_list, AVAILABLE_WIDTH_PT)
             
             # Define fixed headers as simple strings (NOT Paragraph objects)
             # This ensures they respect TableStyle TEXTCOLOR (White on dark blue)
@@ -470,7 +501,7 @@ def generate_repair_pdf(repair_data: dict, filename: str, db_manager=None) -> bo
                 
                 # PADDING CORRECTION
                 # Give numbers space from the right edge so they don't look cramped, but align correctly
-                ('RIGHTPADDING', (3, 0), (-1, -1), 10),  # Price & Total columns get extra right padding
+                ('RIGHTPADDING', (3, 0), (-1, -1), 6),  # Price & Total columns stay compact
                 ('LEFTPADDING', (0, 0), (-1, -1), 6),
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
                 ('TOPPADDING', (0, 1), (-1, -1), 6),
