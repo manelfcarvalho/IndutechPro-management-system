@@ -14,6 +14,8 @@ from typing import List, Optional, Dict, Any
 from contextlib import contextmanager
 import pandas as pd
 
+from database.managers.clients import ClientOperationsMixin
+
 
 def get_base_path():
     """
@@ -87,7 +89,7 @@ DEFAULT_MARGIN = 1.30
 MONEY_COLUMNS = ['Preço Compra', 'Preço Venda', 'Total', 'Total s/ IVA', 'Valor', 'Custo']
 
 
-class DatabaseManager:
+class DatabaseManager(ClientOperationsMixin):
     """Classe para gerenciar a base de dados SQLite com pool de conexões"""
     
     _instance = None
@@ -971,112 +973,8 @@ class DatabaseManager:
     
     # ========== OPERAÇÕES COM REPARAÇÕES ==========
     
-    # ========== OPERAÇÕES COM CLIENTES (CRM) ==========
-    
-    def add_or_update_client(self, name: str, phone: str, nif: str = "", address: str = "") -> int:
-        """
-        Adiciona ou atualiza um cliente
-        
-        Args:
-            name: Nome do cliente
-            phone: Telefone (único, usado como chave)
-            nif: NIF (opcional)
-            address: Morada (opcional)
-        
-        Returns:
-            ID do cliente (novo ou existente)
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Verificar se cliente já existe (por telefone)
-            cursor.execute("SELECT id FROM clients WHERE phone = ?", (phone,))
-            existing = cursor.fetchone()
-            
-            if existing:
-                # Atualizar cliente existente
-                client_id = existing["id"] if isinstance(existing, dict) else existing[0]
-                cursor.execute(
-                    "UPDATE clients SET name = ?, nif = ?, address = ? WHERE id = ?",
-                    (name, nif, address, client_id)
-                )
-                conn.commit()
-                return client_id
-            else:
-                # Inserir novo cliente
-                cursor.execute(
-                    "INSERT INTO clients (name, phone, nif, address) VALUES (?, ?, ?, ?)",
-                    (name, phone, nif, address)
-                )
-                client_id = cursor.lastrowid
-                conn.commit()
-                return client_id
-    
-    def search_client(self, query: str) -> List[Dict]:
-        """
-        Pesquisa clientes por nome ou telefone
-        
-        Args:
-            query: Termo de pesquisa (nome ou telefone)
-        
-        Returns:
-            Lista de clientes encontrados
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            search_pattern = f"%{query}%"
-            cursor.execute(
-                "SELECT * FROM clients WHERE name LIKE ? OR phone LIKE ? ORDER BY name LIMIT 20",
-                (search_pattern, search_pattern)
-            )
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
-    
-    def search_clients_smart(self, query: str, limit: int = 10) -> List[Dict]:
-        """
-        Pesquisa otimizada para a lista de clientes (Meus Clientes).
-        
-        - Se query estiver vazia: devolve os N clientes mais recentes (ORDER BY id DESC LIMIT N)
-        - Se query tiver texto: pesquisa em name, nif e phone (LIKE '%query%') e limita a N resultados.
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            if not query:
-                cursor.execute(
-                    "SELECT * FROM clients ORDER BY id DESC LIMIT ?",
-                    (limit,)
-                )
-            else:
-                pattern = f"%{query}%"
-                cursor.execute(
-                    """
-                    SELECT * FROM clients
-                    WHERE name LIKE ? OR nif LIKE ? OR phone LIKE ?
-                    ORDER BY name
-                    LIMIT ?
-                    """,
-                    (pattern, pattern, pattern, limit)
-                )
-            
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
-    
-    def get_client_by_id(self, client_id: int) -> Dict:
-        """
-        Obtém detalhes de um cliente por ID
-        
-        Args:
-            client_id: ID do cliente
-        
-        Returns:
-            Dicionário com dados do cliente ou None
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
+    # Operações de clientes vivem em database/managers/clients.py.
+
     
     def add_repair(self, client: str, description: str, used_parts: str, total: float, payment_status: str = "Pendente", hours_worked: float = 1.0, client_id: int = None, problem_summary: str = "", device_imei: str = "", repair_status: str = "Em Análise", electricity_hours: float = 0.0, package_weight: float = 0.0, transport_cost: float = 0.0, labor_type: str = "labor1", warranty_number: str = "", horas_teste: float = 0.0, preco_hora_teste: float = 0.0) -> int:
         """
@@ -1329,6 +1227,7 @@ class DatabaseManager:
                 
                 # 5. Calcular delta e validar stock
                 all_ids = set(old_dict.keys()) | set(new_dict.keys())
+                components_by_id = {}
                 
                 for comp_id in all_ids:
                     old_qty = old_dict.get(comp_id, 0)
@@ -1336,7 +1235,14 @@ class DatabaseManager:
                     qty_needed = new_qty - old_qty
                     
                     # Se precisa de mais stock
-                    component = self.get_component_by_id(comp_id)
+                    cursor.execute("SELECT id, name, qty FROM components WHERE id = ?", (comp_id,))
+                    component = cursor.fetchone()
+                    if not component:
+                        if new_qty > 0:
+                            raise ValueError(f"Componente ID {comp_id} nao encontrado na base de dados")
+                        continue
+
+                    components_by_id[comp_id] = component
                     if component:
                         # Buscar componente por ID
                         cursor.execute("SELECT id, name, qty FROM components WHERE id = ?", (comp_id,))
@@ -1348,7 +1254,7 @@ class DatabaseManager:
                         current_stock = component["qty"]
                         component_name = component["name"]
                         
-                        if current_stock < qty_needed:
+                        if qty_needed > 0 and current_stock < qty_needed:
                             raise ValueError(
                                 f"Stock insuficiente para '{component_name}'. "
                                 f"Só existem {current_stock} unidades, mas são necessárias {qty_needed}."
@@ -1364,20 +1270,15 @@ class DatabaseManager:
                     if qty_needed == 0:
                         continue
                     
-                    if qty_needed > 0:
-                        # component is a dict, so .get() is safe
-                        component_id = component.get("id")
-                        current_qty = component.get("qty", 0)
-                        
-                        if qty_needed > 0:
-                            # Consumir stock (adicionar mais componentes)
-                            new_stock = current_qty - qty_needed
-                            self.update_component_qty(component_id, new_stock)
-                        elif qty_needed < 0:
-                            # Restaurar stock (remover ou diminuir componentes)
-                            # qty_needed é negativo, então abs(qty_needed) é a quantidade a restaurar
-                            new_stock = current_qty + abs(qty_needed)
-                            self.update_component_qty(component_id, new_stock)
+                    if comp_id not in components_by_id:
+                        continue
+
+                    cursor.execute(
+                        "UPDATE components SET qty = qty - ? WHERE id = ?",
+                        (qty_needed, comp_id)
+                    )
+                    if cursor.rowcount == 0:
+                        raise ValueError(f"Componente ID {comp_id} nao encontrado na base de dados")
                 
                 # 6. Atualizar reparação
                 set_clauses = []

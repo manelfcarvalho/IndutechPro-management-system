@@ -13,6 +13,20 @@ import platform
 from typing import Optional
 from PIL import Image, ImageTk
 from ui.utils import run_db_operation, run_db_operation_with_loading, get_base_path
+from ui.theme import (
+    apply_modern_style,
+    create_button,
+    create_action_button,
+    create_action_footer,
+    create_list_item,
+    create_page_header,
+    create_table_action_button,
+    create_table_actions_frame,
+    create_table_cell,
+    create_table_header,
+    create_table_row,
+    create_toolbar_button,
+)
 
 
 class StockPage(ctk.CTkFrame):
@@ -26,7 +40,7 @@ class StockPage(ctk.CTkFrame):
             parent: Widget pai
             app: Instância da aplicação principal
         """
-        super().__init__(parent, fg_color=["#f0f0f0", "#1a1a1a"])
+        super().__init__(parent, fg_color="#151617")
         self.app = app
         self.current_data_hash = None  # Para evitar refreshes desnecessários
         self.is_loading = False
@@ -60,67 +74,28 @@ class StockPage(ctk.CTkFrame):
     def setup_ui(self):
         """Configura a interface da página de stock"""
         # Título
-        title_frame = ctk.CTkFrame(self, fg_color="transparent")
-        title_frame.pack(fill="x", padx=20, pady=(20, 10))
-        
-        title_label = ctk.CTkLabel(
-            title_frame,
-            text="Gestão de Stock",
-            font=ctk.CTkFont(size=32, weight="bold"),
-            text_color=["#FF5722", "#FF5722"]
+        _, buttons_frame = create_page_header(
+            self,
+            "Stock",
+            "Pesquisar, editar, importar e repor componentes.",
         )
-        title_label.pack(side="left")
         
         # Botões (voltar, configurações, import/export)
-        buttons_frame = ctk.CTkFrame(title_frame, fg_color="transparent")
-        buttons_frame.pack(side="right")
         
         # Botão importar Excel (usa Master Excel, folha \"Stock\")
-        import_button = ctk.CTkButton(
-            buttons_frame,
-            text="Importar Excel",
-            command=self.import_from_excel,
-            font=ctk.CTkFont(size=12),
-            fg_color=["#2196F3", "#2196F3"],
-            hover_color=["#1976D2", "#1976D2"],
-            width=130,
-            height=30
-        )
-        import_button.pack(side="left", padx=(0, 5))
+        create_toolbar_button(buttons_frame, "Importar Excel", self.import_from_excel, role="primary", width=130)
         
         # Botão configurações de margem
-        settings_button = ctk.CTkButton(
-            buttons_frame,
-            text="Configurar Margem",
-            command=self.open_margin_settings,
-            font=ctk.CTkFont(size=12),
-            fg_color=["#666666", "#444444"],
-            hover_color=["#555555", "#333333"],
-            width=150,
-            height=30
-        )
-        settings_button.pack(side="left", padx=(0, 10))
+        create_toolbar_button(buttons_frame, "Configurar Margem", self.open_margin_settings, role="secondary", width=150)
         
         # Botão voltar
-        back_button = ctk.CTkButton(
-            buttons_frame,
-            text="Voltar",
-            command=lambda: self.app.show_page("home"),
-            font=ctk.CTkFont(size=14),
-            fg_color="transparent",
-            hover_color=["#555555", "#333333"],
-            width=100,
-            height=30
-        )
-        back_button.pack(side="left")
-        
         # Container principal (lista e pesquisa)
         main_container = ctk.CTkFrame(self, fg_color="transparent")
-        main_container.pack(fill="both", expand=True, padx=20, pady=10)
+        main_container.pack(fill="both", expand=True, padx=20, pady=(8, 12))
         
         # Botão para adicionar novo componente
         add_button_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        add_button_frame.pack(fill="x", pady=(0, 10))
+        add_button_frame.pack(fill="x", pady=(0, 8))
         
         def safe_command(func):
             """Wrapper que garante que comandos não bloqueiam o event loop"""
@@ -131,43 +106,42 @@ class StockPage(ctk.CTkFrame):
                     messagebox.showerror("Erro", f"Erro inesperado: {str(e)}")
             return wrapper
         
-        add_component_button = ctk.CTkButton(
+        create_toolbar_button(
             add_button_frame,
-            text="Novo Componente",
-            command=safe_command(lambda: self.open_component_dialog()),
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color=["#2196F3", "#2196F3"],
-            hover_color=["#1976D2", "#1976D2"],
-            height=40,
-            width=200
+            "Novo Componente",
+            safe_command(lambda: self.open_component_dialog()),
+            role="success",
+            width=170,
         )
-        add_component_button.pack(side="left", padx=(0, 10))
         
         # Botão para entrada rápida de stock
-        fast_restock_button = ctk.CTkButton(
+        create_toolbar_button(
             add_button_frame,
-            text="Entrada de Stock",
-            command=safe_command(lambda: self.open_fast_restock_dialog()),
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color=["#4CAF50", "#4CAF50"],
-            hover_color=["#45a049", "#45a049"],
-            height=40,
-            width=200
+            "Entrada de Stock",
+            safe_command(lambda: self.open_fast_restock_dialog()),
+            role="success",
+            width=170,
         )
-        fast_restock_button.pack(side="left")
         
         # Lista e pesquisa
-        list_frame = ctk.CTkFrame(main_container)
+        list_frame = ctk.CTkFrame(
+            main_container,
+            fg_color="#202124",
+            corner_radius=8,
+            border_width=1,
+            border_color="#35363a",
+        )
         list_frame.pack(fill="both", expand=True)
         
         # Barra de pesquisa
         search_frame = ctk.CTkFrame(list_frame, fg_color="transparent")
-        search_frame.pack(fill="x", padx=20, pady=(20, 10))
+        search_frame.pack(fill="x", padx=18, pady=(16, 10))
         
         search_label = ctk.CTkLabel(
             search_frame,
-            text="Pesquisar:",
-            font=ctk.CTkFont(size=14)
+            text="Pesquisar",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#b8b8b8",
         )
         search_label.pack(side="left", padx=(0, 10))
         
@@ -175,7 +149,8 @@ class StockPage(ctk.CTkFrame):
             search_frame,
             placeholder_text="Código ou nome...",
             font=ctk.CTkFont(size=14),
-            width=300
+            width=300,
+            height=34
         )
         self.search_entry.pack(side="left", fill="x", expand=True)
 
@@ -196,8 +171,14 @@ class StockPage(ctk.CTkFrame):
         self.search_entry.bind("<KeyRelease>", on_search_key_release)
         
         # Scrollable frame para a lista
-        scrollable_frame = ctk.CTkScrollableFrame(list_frame)
-        scrollable_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        scrollable_frame = ctk.CTkScrollableFrame(
+            list_frame,
+            fg_color="#151617",
+            corner_radius=8,
+            border_width=1,
+            border_color="#35363a",
+        )
+        scrollable_frame.pack(fill="both", expand=True, padx=18, pady=(0, 14))
         
         self.list_container = scrollable_frame
         
@@ -299,6 +280,7 @@ class StockPage(ctk.CTkFrame):
         dialog.title("Adicionar Componente" if component_id is None else "Editar Componente")
         dialog.geometry("800x600")
         dialog.minsize(700, 500)
+        dialog.configure(fg_color="#151617")
         dialog.resizable(True, True)
         dialog.transient(self)
         
@@ -338,13 +320,19 @@ class StockPage(ctk.CTkFrame):
                 messagebox.showerror("Erro", f"Erro ao abrir PDF: {str(e)}")
         
         # ========== SCROLLABLE CONTENT (TOP) ==========
-        scrollable_content = ctk.CTkScrollableFrame(dialog)
-        scrollable_content.pack(fill="both", expand=True, padx=10, pady=10)
+        scrollable_content = ctk.CTkScrollableFrame(dialog, fg_color="#151617")
+        scrollable_content.pack(fill="both", expand=True, padx=16, pady=(16, 10))
         scrollable_content.grid_columnconfigure(0, weight=1, uniform="scroll_cols")
         scrollable_content.grid_columnconfigure(1, weight=1, uniform="scroll_cols")
         
         # ========== COLUNA ESQUERDA: INPUTS ==========
-        left_frame = ctk.CTkFrame(scrollable_content)
+        left_frame = ctk.CTkFrame(
+            scrollable_content,
+            fg_color="#202124",
+            corner_radius=8,
+            border_width=1,
+            border_color="#35363a",
+        )
         left_frame.grid(row=0, column=0, padx=(0, 10), pady=0, sticky="nsew")
         left_frame.grid_columnconfigure(0, weight=1)
         
@@ -352,19 +340,21 @@ class StockPage(ctk.CTkFrame):
         title_label = ctk.CTkLabel(
             left_frame,
             text="Informações do Componente",
-            font=ctk.CTkFont(size=16, weight="bold")
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color="#f5f5f5",
         )
-        title_label.pack(pady=(15, 20))
+        title_label.pack(anchor="w", padx=16, pady=(16, 12))
         
         # Função helper para criar campos
         def create_field(parent, label_text, row):
             frame = ctk.CTkFrame(parent, fg_color="transparent")
-            frame.pack(fill="x", padx=15, pady=8)
+            frame.pack(fill="x", padx=16, pady=(4, 7))
             
             label = ctk.CTkLabel(
                 frame,
                 text=label_text,
-                font=ctk.CTkFont(size=12),
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color="#b8b8b8",
                 anchor="w"
             )
             label.pack(fill="x", pady=(0, 5))
@@ -391,12 +381,13 @@ class StockPage(ctk.CTkFrame):
         
         # Datasheet PDF
         datasheet_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
-        datasheet_frame.pack(fill="x", padx=15, pady=8)
+        datasheet_frame.pack(fill="x", padx=16, pady=(4, 10))
         
         datasheet_label = ctk.CTkLabel(
             datasheet_frame,
             text="Datasheet PDF:",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#b8b8b8",
             anchor="w"
         )
         datasheet_label.pack(fill="x", pady=(0, 5))
@@ -534,7 +525,13 @@ class StockPage(ctk.CTkFrame):
         calculate_price()  # Calcular inicial
         
         # ========== COLUNA DIREITA: MEDIA ==========
-        right_frame = ctk.CTkFrame(scrollable_content)
+        right_frame = ctk.CTkFrame(
+            scrollable_content,
+            fg_color="#202124",
+            corner_radius=8,
+            border_width=1,
+            border_color="#35363a",
+        )
         right_frame.grid(row=0, column=1, padx=(10, 0), pady=0, sticky="nsew")
         right_frame.grid_columnconfigure(0, weight=1)
         
@@ -542,9 +539,10 @@ class StockPage(ctk.CTkFrame):
         media_title = ctk.CTkLabel(
             right_frame,
             text="Foto do Produto",
-            font=ctk.CTkFont(size=16, weight="bold")
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color="#f5f5f5",
         )
-        media_title.pack(pady=(15, 20))
+        media_title.pack(anchor="w", padx=16, pady=(16, 12))
         
         # Preview da imagem (max 300x300, mantendo aspect ratio)
         image_preview_label = ctk.CTkLabel(
@@ -553,7 +551,7 @@ class StockPage(ctk.CTkFrame):
             font=ctk.CTkFont(size=12),
             width=300,
             height=300,
-            fg_color=["#e0e0e0", "#2b2b2b"],
+            fg_color="#151617",
             corner_radius=8
         )
         image_preview_label.pack(pady=(0, 15))
@@ -614,11 +612,7 @@ class StockPage(ctk.CTkFrame):
         load_image_button.pack()
         
         # ========== BOTÕES DE AÇÃO (FIXED BOTTOM) ==========
-        action_frame = ctk.CTkFrame(dialog, height=70)
-        action_frame.pack(fill="x", side="bottom", padx=10, pady=10)
-        action_frame.pack_propagate(False)
-        action_frame.grid_columnconfigure(0, weight=1)
-        action_frame.grid_columnconfigure(1, weight=1)
+        action_frame = create_action_footer(dialog, padx=16, pady=(0, 16))
         
         def save_component():
             try:
@@ -696,27 +690,22 @@ class StockPage(ctk.CTkFrame):
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao guardar componente: {str(e)}")
         
-        save_button = ctk.CTkButton(
+        save_button = create_action_button(
             action_frame,
             text="Guardar",
             command=save_component,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color=["#2196F3", "#2196F3"],
-            hover_color=["#1976D2", "#1976D2"],
-            height=40
+            role="primary",
+            width=130,
         )
-        save_button.grid(row=0, column=0, padx=(0, 10), pady=10, sticky="ew")
         
-        cancel_button = ctk.CTkButton(
+        cancel_button = create_action_button(
             action_frame,
             text="Cancelar",
             command=dialog.destroy,
-            font=ctk.CTkFont(size=14),
-            fg_color="transparent",
-            hover_color=["#555555", "#333333"],
-            height=40
+            role="secondary",
+            width=120,
         )
-        cancel_button.grid(row=0, column=1, pady=10, sticky="ew")
+        apply_modern_style(dialog)
         
         # Se for edição, carregar dados do componente
         if component_id is not None:
@@ -809,47 +798,56 @@ class StockPage(ctk.CTkFrame):
         # Criar janela de diálogo
         dialog = ctk.CTkToplevel(self)
         dialog.title("Configurar Margem Padrão")
-        dialog.geometry("400x200")
+        dialog.geometry("460x260")
+        dialog.configure(fg_color="#151617")
         dialog.transient(self)  # Tornar modal
         dialog.grab_set()  # Capturar eventos
         
         # Centralizar
         dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
-        y = (dialog.winfo_screenheight() // 2) - (200 // 2)
-        dialog.geometry(f"400x200+{x}+{y}")
+        x = (dialog.winfo_screenwidth() // 2) - (460 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (260 // 2)
+        dialog.geometry(f"460x260+{x}+{y}")
         
         # Container principal
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=30, pady=30)
+        main_frame = ctk.CTkFrame(
+            dialog,
+            fg_color="#202124",
+            corner_radius=8,
+            border_width=1,
+            border_color="#35363a",
+        )
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Título
         title_label = ctk.CTkLabel(
             main_frame,
             text="Margem de Lucro Padrão",
-            font=ctk.CTkFont(size=18, weight="bold")
+            font=ctk.CTkFont(size=20, weight="bold"),
+            text_color="#f5f5f5",
         )
-        title_label.pack(pady=(0, 10))
+        title_label.pack(anchor="w", padx=18, pady=(18, 6))
         
         # Descrição
         desc_label = ctk.CTkLabel(
             main_frame,
             text="Qual a margem de lucro padrão (%)?",
-            font=ctk.CTkFont(size=14)
+            font=ctk.CTkFont(size=13),
+            text_color="#b8b8b8",
         )
-        desc_label.pack(pady=(0, 15))
+        desc_label.pack(anchor="w", padx=18, pady=(0, 14))
         
         # Campo de entrada
         entry_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        entry_frame.pack(fill="x", pady=(0, 20))
+        entry_frame.pack(fill="x", padx=18, pady=(0, 18))
         
         margin_entry = ctk.CTkEntry(
             entry_frame,
             font=ctk.CTkFont(size=16),
-            height=40,
-            width=200
+            height=36,
+            width=180
         )
-        margin_entry.pack()
+        margin_entry.pack(anchor="w")
         
         # Carregar valor atual
         try:
@@ -859,8 +857,7 @@ class StockPage(ctk.CTkFrame):
             margin_entry.insert(0, "30")
         
         # Botões
-        buttons_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        buttons_frame.pack(fill="x")
+        buttons_frame = create_action_footer(main_frame)
         
         def save_margin():
             try:
@@ -901,29 +898,22 @@ class StockPage(ctk.CTkFrame):
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro: {str(e)}")
         
-        save_button = ctk.CTkButton(
+        save_button = create_action_button(
             buttons_frame,
             text="Guardar",
             command=save_margin,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color=["#4CAF50", "#4CAF50"],
-            hover_color=["#45a049", "#45a049"],
+            role="success",
             width=120,
-            height=35
         )
-        save_button.pack(side="left", padx=(0, 10), expand=True)
         
-        cancel_button = ctk.CTkButton(
+        cancel_button = create_action_button(
             buttons_frame,
             text="Cancelar",
             command=dialog.destroy,
-            font=ctk.CTkFont(size=14),
-            fg_color="transparent",
-            hover_color=["#555555", "#333333"],
+            role="secondary",
             width=120,
-            height=35
         )
-        cancel_button.pack(side="left", expand=True)
+        apply_modern_style(dialog)
         
         # Focar no campo de entrada
         margin_entry.focus_set()
@@ -1188,36 +1178,25 @@ class StockPage(ctk.CTkFrame):
         }
         
         # ========== ACTION BUTTONS (AT BOTTOM) ==========
-        action_frame = ctk.CTkFrame(details_window, fg_color="transparent")
-        action_frame.pack(fill="x", padx=20, pady=20)
-        action_frame.grid_columnconfigure(0, weight=1)
-        action_frame.grid_columnconfigure(1, weight=1)
+        action_frame = create_action_footer(details_window, padx=20, pady=(8, 20))
         
         # Edit/Save button
-        edit_save_button = ctk.CTkButton(
+        edit_save_button = create_action_button(
             action_frame,
             text="Editar",
             command=None,  # Will be set after loading data
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color=["#2196F3", "#2196F3"],
-            hover_color=["#1976D2", "#1976D2"],
+            role="primary",
             width=150,
-            height=40
         )
-        edit_save_button.grid(row=0, column=0, padx=5)
         
         # Cancel/Close button
-        cancel_button = ctk.CTkButton(
+        cancel_button = create_action_button(
             action_frame,
             text="Fechar",
             command=details_window.destroy,
-            font=ctk.CTkFont(size=14),
-            fg_color="transparent",
-            hover_color=["#555555", "#333333"],
+            role="secondary",
             width=150,
-            height=40
         )
-        cancel_button.grid(row=0, column=1, padx=5)
         
         # Function to toggle edit mode
         def toggle_edit_mode():
@@ -1236,11 +1215,7 @@ class StockPage(ctk.CTkFrame):
                 load_pdf_button.pack(pady=5)
                 
                 # Change button to "Guardar" (Save)
-                edit_save_button.configure(
-                    text="Guardar",
-                    fg_color=["#2196F3", "#2196F3"],
-                    hover_color=["#1976D2", "#1976D2"]
-                )
+                edit_save_button.configure(text="Guardar")
                 cancel_button.configure(text="Cancelar")
             else:
                 # View Mode: Disable ALL inputs, hide upload buttons
@@ -1252,11 +1227,7 @@ class StockPage(ctk.CTkFrame):
                 load_pdf_button.pack_forget()
                 
                 # Change button back to "Editar"
-                edit_save_button.configure(
-                    text="Editar",
-                    fg_color=["#2196F3", "#2196F3"],
-                    hover_color=["#1976D2", "#1976D2"]
-                )
+                edit_save_button.configure(text="Editar")
                 cancel_button.configure(text="Fechar")
         
         # Function to save changes
@@ -1453,37 +1424,56 @@ class StockPage(ctk.CTkFrame):
             # Criar janela de diálogo
             dialog = ctk.CTkToplevel(self)
             dialog.title("Entrada de Stock")
-            dialog.geometry("600x500")
-            dialog.minsize(500, 400)
+            dialog.geometry("640x660")
+            dialog.minsize(560, 560)
+            dialog.configure(fg_color="#151617")
             dialog.resizable(True, True)
             dialog.transient(self)
             
             # Centralizar
             dialog.update_idletasks()
-            x = (dialog.winfo_screenwidth() // 2) - (600 // 2)
-            y = (dialog.winfo_screenheight() // 2) - (500 // 2)
-            dialog.geometry(f"600x500+{x}+{y}")
+            x = (dialog.winfo_screenwidth() // 2) - (640 // 2)
+            y = (dialog.winfo_screenheight() // 2) - (660 // 2)
+            dialog.geometry(f"640x660+{x}+{y}")
             
             # Container principal
-            main_frame = ctk.CTkFrame(dialog)
+            main_frame = ctk.CTkFrame(
+                dialog,
+                fg_color="#202124",
+                corner_radius=8,
+                border_width=1,
+                border_color="#35363a",
+            )
             main_frame.pack(fill="both", expand=True, padx=20, pady=20)
             
             # Título
             title_label = ctk.CTkLabel(
                 main_frame,
                 text="Entrada de Stock",
-                font=ctk.CTkFont(size=20, weight="bold")
+                font=ctk.CTkFont(size=21, weight="bold"),
+                text_color="#f5f5f5",
+                anchor="w",
             )
-            title_label.pack(pady=(0, 15))
+            title_label.pack(fill="x", padx=16, pady=(16, 2))
+
+            subtitle_label = ctk.CTkLabel(
+                main_frame,
+                text="Pesquisar componente, selecionar e atualizar quantidade.",
+                font=ctk.CTkFont(size=12),
+                text_color="#b8b8b8",
+                anchor="w",
+            )
+            subtitle_label.pack(fill="x", padx=16, pady=(0, 12))
             
             # Barra de pesquisa (topo)
             search_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            search_frame.pack(fill="x", pady=(0, 10))
+            search_frame.pack(fill="x", padx=16, pady=(0, 10))
             
             search_label = ctk.CTkLabel(
                 search_frame,
-                text="Pesquisar:",
-                font=ctk.CTkFont(size=14)
+                text="Pesquisar",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color="#b8b8b8",
             )
             search_label.pack(side="left", padx=(0, 10))
             
@@ -1503,40 +1493,64 @@ class StockPage(ctk.CTkFrame):
                 font=ctk.CTkFont(size=12),
                 anchor="w"
             )
-            results_label.pack(fill="x", pady=(10, 5))
+            results_label.pack(fill="x", padx=16, pady=(10, 5))
             
-            results_scrollable = ctk.CTkScrollableFrame(main_frame)
-            results_scrollable.pack(fill="both", expand=True, pady=(0, 10))
+            results_scrollable = ctk.CTkScrollableFrame(
+                main_frame,
+                fg_color="#151617",
+                corner_radius=8,
+                border_width=1,
+                border_color="#35363a",
+            )
+            results_scrollable.pack(fill="both", expand=True, padx=16, pady=(0, 10))
 
             # Frame oculto para seleção + quantidade (mostrado após seleção)
-            quantity_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            quantity_frame.pack(fill="x", pady=(5, 0))
+            quantity_frame = ctk.CTkFrame(
+                main_frame,
+                fg_color="#151617",
+                corner_radius=8,
+                border_width=1,
+                border_color="#35363a",
+            )
+            quantity_frame.pack(fill="x", padx=16, pady=(5, 0))
             quantity_frame.pack_forget()
             
             selected_info_label = ctk.CTkLabel(
                 quantity_frame,
                 text="",
                 font=ctk.CTkFont(size=14, weight="bold"),
+                text_color="#f5f5f5",
                 anchor="w"
             )
-            selected_info_label.pack(fill="x", pady=(0, 5))
+            selected_info_label.pack(fill="x", padx=14, pady=(12, 8))
+
+            qty_row = ctk.CTkFrame(quantity_frame, fg_color="transparent")
+            qty_row.pack(fill="x", padx=14, pady=(0, 12))
+            qty_row.grid_columnconfigure(1, weight=1)
             
             qty_label = ctk.CTkLabel(
-                quantity_frame,
+                qty_row,
                 text="Quantidade a Adicionar:",
-                font=ctk.CTkFont(size=12)
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color="#b8b8b8",
             )
-            qty_label.pack(anchor="w", pady=(0, 5))
+            qty_label.grid(row=0, column=0, sticky="w", padx=(0, 10))
             
             qty_entry = ctk.CTkEntry(
-                quantity_frame,
+                qty_row,
                 font=ctk.CTkFont(size=14),
-                height=35
+                height=35,
+                width=120,
             )
-            qty_entry.pack(fill="x")
-            
-            buttons_frame = ctk.CTkFrame(quantity_frame, fg_color="transparent")
-            buttons_frame.pack(fill="x", pady=(5, 0))
+            qty_entry.grid(row=0, column=1, sticky="w")
+
+            units_label = ctk.CTkLabel(
+                qty_row,
+                text="unidades",
+                font=ctk.CTkFont(size=12),
+                text_color="#b8b8b8",
+            )
+            units_label.grid(row=0, column=2, sticky="w", padx=(10, 0))
 
             # Estado do componente selecionado
             selected_component = {"id": None, "code": "", "name": "", "qty": 0}
@@ -1589,27 +1603,23 @@ class StockPage(ctk.CTkFrame):
                 except Exception as e:
                     messagebox.showerror("Erro", f"Erro inesperado: {str(e)}")
             
-            save_button = ctk.CTkButton(
+            buttons_frame = create_action_footer(main_frame, padx=16, pady=(8, 16))
+
+            save_button = create_action_button(
                 buttons_frame,
                 text="Guardar",
                 command=save_quantity,
-                font=ctk.CTkFont(size=14, weight="bold"),
-                fg_color=["#4CAF50", "#4CAF50"],
-                hover_color=["#45a049", "#45a049"],
-                height=35
+                role="success",
+                width=120,
             )
-            save_button.pack(side="left", padx=(0, 10), expand=True)
             
-            cancel_button = ctk.CTkButton(
+            cancel_button = create_action_button(
                 buttons_frame,
                 text="Cancelar",
                 command=dialog.destroy,
-                font=ctk.CTkFont(size=14),
-                fg_color="transparent",
-                hover_color=["#555555", "#333333"],
-                height=35
+                role="secondary",
+                width=120,
             )
-            cancel_button.pack(side="left", expand=True)
 
             # Permitir Enter para guardar rapidamente
             dialog.bind("<Return>", lambda e: save_quantity())
@@ -1635,18 +1645,6 @@ class StockPage(ctk.CTkFrame):
                     name = comp.get("name", "")
                     qty = comp.get("qty", 0)
 
-                    item_frame = ctk.CTkFrame(results_scrollable)
-                    item_frame.pack(fill="x", pady=3, padx=5)
-
-                    item_text = f"[{code}] {name} (Atual: {qty})"
-                    item_label = ctk.CTkLabel(
-                        item_frame,
-                        text=item_text,
-                        font=ctk.CTkFont(size=13),
-                        anchor="w"
-                    )
-                    item_label.pack(side="left", padx=10, pady=8, fill="x", expand=True)
-
                     def on_select(local_comp=comp):
                         selected_component["id"] = local_comp.get("id")
                         selected_component["code"] = local_comp.get("code", "")
@@ -1658,23 +1656,20 @@ class StockPage(ctk.CTkFrame):
 
                         info_text = f"[{selected_component['code']}] {selected_component['name']} (Stock Atual: {selected_component['qty']})"
                         selected_info_label.configure(text=info_text)
-                        quantity_frame.pack(fill="x", pady=(5, 0))
+                        quantity_frame.pack(fill="x", padx=16, pady=(5, 0))
                         qty_entry.delete(0, "end")
                         qty_entry.focus_set()
 
-                    item_label.bind("<Button-1>", lambda e, lc=comp: on_select(lc))
-
-                    select_button = ctk.CTkButton(
-                        item_frame,
-                        text="Selecionar",
+                    create_list_item(
+                        results_scrollable,
+                        title=f"[{code}] {name}",
+                        subtitle=f"Stock atual: {qty}",
                         command=lambda lc=comp: on_select(lc),
-                        font=ctk.CTkFont(size=12),
-                        width=100,
-                        height=30,
-                        fg_color=["#4CAF50", "#4CAF50"],
-                        hover_color=["#45a049", "#45a049"]
+                        action_text="Selecionar",
+                        action_command=lambda lc=comp: on_select(lc),
+                        action_role="success",
+                        action_width=100,
                     )
-                    select_button.pack(side="right", padx=10, pady=5)
 
             def perform_search(term: str, limit: int = 5, auto_select_on_exact_code: bool = False):
                 term = term.strip()
@@ -1711,7 +1706,7 @@ class StockPage(ctk.CTkFrame):
 
                             info_text = f"[{selected_component['code']}] {selected_component['name']} (Stock Atual: {selected_component['qty']})"
                             selected_info_label.configure(text=info_text)
-                            quantity_frame.pack(fill="x", pady=(5, 0))
+                            quantity_frame.pack(fill="x", padx=16, pady=(5, 0))
                             qty_entry.delete(0, "end")
                             qty_entry.focus_set()
                             return
@@ -1745,19 +1740,7 @@ class StockPage(ctk.CTkFrame):
             search_entry.bind("<Return>", on_search_return)
 
             # Botão fechar
-            close_button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            close_button_frame.pack(fill="x", pady=(10, 0))
-            
-            close_button = ctk.CTkButton(
-                close_button_frame,
-                text="Fechar",
-                command=dialog.destroy,
-                font=ctk.CTkFont(size=14),
-                fg_color="transparent",
-                hover_color=["#555555", "#333333"],
-                height=35
-            )
-            close_button.pack(side="right")
+            apply_modern_style(dialog)
 
         except Exception as e:
             print(f"CRITICAL ERROR: Erro ao abrir Entrada de Stock: {e}")
@@ -1819,34 +1802,24 @@ class StockPage(ctk.CTkFrame):
                 no_data_label = ctk.CTkLabel(
                     self.list_container,
                     text=text,
-                    font=ctk.CTkFont(size=16),
-                    text_color=["#666666", "#999999"]
+                    font=ctk.CTkFont(size=14),
+                    text_color="#8f949c"
                 )
                 no_data_label.pack(pady=50)
                 return
             
             # Criar cabeçalho da tabela
-            header_frame = ctk.CTkFrame(self.list_container, fg_color=["#e0e0e0", "#2b2b2b"])
-            header_frame.pack(fill="x", pady=(0, 10))
+            header_frame = create_table_header(
+                self.list_container,
+                ["Codigo", "Nome", "Familia", "Preco Compra", "Preco Venda", "Qtd", "Acoes"],
+                [1, 4, 2, 1, 1, 1, 2],
+                "stock_cols",
+                min_widths={6: 150},
+            )
             
             # Configurar pesos das colunas (Code:1, Name:4, Family:2, Preço Compra:1, Price:1, Qty:1, Actions:2)
-            column_weights = [1, 4, 2, 1, 1, 1, 2]
-            for i, weight in enumerate(column_weights):
-                if i == 6:  # Actions column - needs minimum width
-                    header_frame.grid_columnconfigure(i, weight=weight, uniform="stock_cols", minsize=150)
-                else:
-                    header_frame.grid_columnconfigure(i, weight=weight, uniform="stock_cols")
             
-            headers = ["Código", "Nome", "Família", "Preço Compra", "Preço Venda", "Qtd", "Ações"]
             
-            for i, header in enumerate(headers):
-                label = ctk.CTkLabel(
-                    header_frame,
-                    text=header,
-                    font=ctk.CTkFont(size=14, weight="bold"),
-                    anchor="w"
-                )
-                label.grid(row=0, column=i, padx=5, pady=10, sticky="ew")
             
             # Adicionar componentes (máx 10 resultados)
             for component in components:
@@ -1856,47 +1829,42 @@ class StockPage(ctk.CTkFrame):
     
     def create_component_row(self, component: dict):
         """Cria uma linha na lista para um componente"""
-        row_frame = ctk.CTkFrame(self.list_container)
-        row_frame.pack(fill="x", pady=5)
+        row_frame = create_table_row(
+            self.list_container,
+            [1, 4, 2, 1, 1, 1, 2],
+            "stock_cols",
+            min_widths={6: 150},
+        )
         
         # Configurar pesos das colunas (idêntico ao header)
-        column_weights = [1, 4, 2, 1, 1, 1, 2]
-        for i, weight in enumerate(column_weights):
-            if i == 6:  # Actions column - needs minimum width
-                row_frame.grid_columnconfigure(i, weight=weight, uniform="stock_cols", minsize=150)
-            else:
-                row_frame.grid_columnconfigure(i, weight=weight, uniform="stock_cols")
         
         # Dados
-        code_label = ctk.CTkLabel(
+        code_label = create_table_cell(
             row_frame,
             text=component["code"],
-            font=ctk.CTkFont(size=13),
-            anchor="w"
+            column=0,
+            weight="bold",
+            text_color="#f5f5f5",
         )
-        code_label.grid(row=0, column=0, padx=5, pady=10, sticky="ew")
         
         # Nome (sem indicador visual de foto)
         name_text = component["name"]
         
-        name_label = ctk.CTkLabel(
+        name_label = create_table_cell(
             row_frame,
             text=name_text,
-            font=ctk.CTkFont(size=13),
-            anchor="w"
+            column=1,
+            text_color="#d7dbe0",
         )
-        name_label.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
         
         # Família (Family)
         family_text = component.get("family", "") or "—"  # Show "—" if empty
-        family_label = ctk.CTkLabel(
+        family_label = create_table_cell(
             row_frame,
             text=family_text,
-            font=ctk.CTkFont(size=13),
-            anchor="w",
-            text_color=["#666666", "#999999"] if not component.get("family") else ["#333333", "#cccccc"]
+            column=2,
+            text_color="#8f949c" if not component.get("family") else "#c9ced6",
         )
-        family_label.grid(row=0, column=2, padx=5, pady=10, sticky="ew")
         
         # Preço de venda e preço de compra (preco_compra armazenado na BD)
         selling_price = component["price"]
@@ -1913,20 +1881,21 @@ class StockPage(ctk.CTkFrame):
         cost_label = ctk.CTkLabel(
             row_frame,
             text=f"{preco_compra:.2f} €",
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=12),
+            text_color="#c9ced6",
             anchor="w"
         )
-        cost_label.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
+        cost_label.grid(row=0, column=3, padx=7, pady=8, sticky="ew")
         
         # Preço de Venda
         price_label = ctk.CTkLabel(
             row_frame,
             text=f"{selling_price:.2f} €",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             anchor="w",
-            text_color=["#4CAF50", "#4CAF50"]
+            text_color="#16A34A"
         )
-        price_label.grid(row=0, column=4, padx=5, pady=10, sticky="ew")
+        price_label.grid(row=0, column=4, padx=7, pady=8, sticky="ew")
         
         # Quantidade com alerta de stock baixo
         qty = component["qty"]
@@ -1935,17 +1904,14 @@ class StockPage(ctk.CTkFrame):
         qty_label = ctk.CTkLabel(
             row_frame,
             text=str(qty),
-            font=ctk.CTkFont(size=13, weight="bold" if is_low_stock else "normal"),
+            font=ctk.CTkFont(size=12, weight="bold" if is_low_stock else "normal"),
             anchor="w",
-            text_color=["#F44336", "#F44336"] if is_low_stock else ["#333333", "#cccccc"]
+            text_color="#DC2626" if is_low_stock else "#c9ced6"
         )
-        qty_label.grid(row=0, column=5, padx=5, pady=10, sticky="ew")
+        qty_label.grid(row=0, column=5, padx=7, pady=8, sticky="ew")
         
         # Botões de ação
-        actions_frame = ctk.CTkFrame(row_frame, fg_color="transparent")
-        actions_frame.grid(row=0, column=6, padx=5, pady=5, sticky="ew")
-        actions_frame.grid_columnconfigure(0, weight=1)
-        actions_frame.grid_columnconfigure(1, weight=1)
+        actions_frame = create_table_actions_frame(row_frame, row=0, column=6, padx=7, pady=6)
         
         # Wrappers seguros para os botões
         def safe_edit_command(comp_id):
@@ -1963,29 +1929,21 @@ class StockPage(ctk.CTkFrame):
                 messagebox.showerror("Erro", f"Erro ao remover componente: {str(e)}")
         
         # View/Details button
-        view_button = ctk.CTkButton(
+        view_button = create_table_action_button(
             actions_frame,
             text="Detalhes",
             command=lambda: safe_edit_command(component["id"]),  # Will open details window
-            font=ctk.CTkFont(size=12),
-            fg_color=["#2196F3", "#2196F3"],
-            hover_color=["#1976D2", "#1976D2"],
+            role="primary",
             width=90,
-            height=30
         )
-        view_button.pack(side="left", padx=2)
         
-        delete_button = ctk.CTkButton(
+        delete_button = create_table_action_button(
             actions_frame,
             text="Remover",
             command=lambda: safe_delete_command(component["id"]),
-            font=ctk.CTkFont(size=12),
-            fg_color=["#f44336", "#f44336"],
-            hover_color=["#d32f2f", "#d32f2f"],
+            role="danger",
             width=80,
-            height=30
         )
-        delete_button.pack(side="left", padx=2)
     
     def import_from_excel(self):
         """Importa componentes de um ficheiro Excel (folha 'Stock' do Master Excel, se existir)"""

@@ -23,12 +23,40 @@ O projeto foi organizado para uso real em empresa: o codigo pode evoluir sem obr
 
 Mais detalhe em [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md).
 
-## Instalar Dependencias
+## Ambiente Virtual e Dependencias
 
 Recomendado usar Python 3.11 ou superior.
 
+Criar a venv local:
+
 ```powershell
+python -m venv .venv
+```
+
+Ativar a venv no PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Se o PowerShell bloquear a ativacao nesta sessao:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Instalar as dependencias da app:
+
+```powershell
+python -m pip install --upgrade pip
 python -m pip install -r requirements-app.txt
+```
+
+Para desenvolvimento, testes e build, instala as dependencias completas:
+
+```powershell
+python -m pip install -r requirements-dev.txt
 ```
 
 ## Executar em Desenvolvimento

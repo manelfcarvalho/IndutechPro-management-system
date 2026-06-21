@@ -15,6 +15,7 @@ from ui.pages.stock_page import StockPage
 from ui.pages.service_page import ServicePage
 from ui.pages.clients_page import ClientsPage
 from ui.pages.client_list_page import ClientListPage
+from ui.theme import apply_modern_style
 
 
 class IndutechproApp:
@@ -33,8 +34,8 @@ class IndutechproApp:
         # Criar janela principal
         self.root = ctk.CTk()
         self.root.title("Indutechpro - Sistema de Gestão")
-        self.root.geometry("1200x800")
-        self.root.minsize(1000, 700)
+        self.root.geometry("1150x760")
+        self.root.minsize(860, 560)
         
         # Mac-specific optimizations: Prevent aggressive redraws on focus
         try:
@@ -52,14 +53,23 @@ class IndutechproApp:
         # Track current page to prevent unnecessary refreshes
         self.current_page_name = None
         self._prevent_focus_refresh = True  # Prevent refresh on focus events
+        self.nav_buttons = {}
         
         # Bind focus events but prevent automatic refresh
         self.root.bind("<FocusIn>", self._on_focus_in)
         self.root.bind("<Map>", self._on_map)
         
         # Container para páginas (criar primeiro para splash overlay)
-        self.container = ctk.CTkFrame(self.root, fg_color="transparent")
-        self.container.pack(fill="both", expand=True, padx=10, pady=10)
+        self.root.configure(fg_color="#151617")
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=0)
+        self.root.grid_columnconfigure(1, weight=1)
+
+        self.sidebar = self._create_sidebar()
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+
+        self.container = ctk.CTkFrame(self.root, fg_color="#151617", corner_radius=0)
+        self.container.grid(row=0, column=1, sticky="nsew", padx=(0, 10), pady=10)
         
         # Criar splash screen como Frame overlay
         self.splash_frame = self._create_splash_overlay()
@@ -69,6 +79,97 @@ class IndutechproApp:
         
         # Inicializar em background thread
         self._init_app_async()
+
+    def _create_sidebar(self):
+        """Cria a navegacao lateral persistente."""
+        sidebar = ctk.CTkFrame(
+            self.root,
+            width=236,
+            fg_color="#0b0e11",
+            corner_radius=0,
+        )
+        sidebar.grid_propagate(False)
+        sidebar.grid_columnconfigure(0, weight=1)
+        sidebar.grid_rowconfigure(8, weight=1)
+
+        brand_frame = ctk.CTkFrame(sidebar, fg_color="transparent")
+        brand_frame.grid(row=0, column=0, sticky="ew", padx=18, pady=(26, 24))
+        brand_frame.grid_columnconfigure(0, weight=1)
+
+        logo_path = resource_path("assets/logo.png")
+        logo_label = None
+        try:
+            if os.path.exists(logo_path):
+                pil_image = Image.open(logo_path)
+                original_w, original_h = pil_image.size
+                ratio = min(176 / original_w, 44 / original_h)
+                logo_image = ctk.CTkImage(
+                    light_image=pil_image,
+                    dark_image=pil_image,
+                    size=(int(original_w * ratio), int(original_h * ratio)),
+                )
+                logo_label = ctk.CTkLabel(brand_frame, image=logo_image, text="")
+        except Exception:
+            logo_label = None
+
+        if logo_label is None:
+            logo_label = ctk.CTkLabel(
+                brand_frame,
+                text="INDUTECHPRO",
+                font=ctk.CTkFont(size=17, weight="bold"),
+                text_color="#FF5722",
+                anchor="w",
+            )
+        logo_label.grid(row=0, column=0, sticky="w")
+
+        nav_items = [
+            ("home", "Dashboard"),
+            ("service", "Nova reparacao"),
+            ("stock", "Stock"),
+            ("client_list", "Clientes"),
+            ("clients", "Historico"),
+        ]
+        for index, (page_name, label) in enumerate(nav_items, start=1):
+            self._add_nav_button(sidebar, page_name, label, row=index)
+
+        footer = ctk.CTkLabel(
+            sidebar,
+            text="Indutechpro",
+            font=ctk.CTkFont(size=11),
+            text_color="#5f646c",
+            anchor="w",
+        )
+        footer.grid(row=10, column=0, sticky="ew", padx=20, pady=(8, 18))
+
+        return sidebar
+
+    def _add_nav_button(self, sidebar, page_name, label, row):
+        button = ctk.CTkButton(
+            sidebar,
+            text=f"  {label}",
+            command=lambda name=page_name: self.show_page(name),
+            font=ctk.CTkFont(size=13, weight="bold"),
+            anchor="w",
+            height=40,
+            corner_radius=9,
+            fg_color="transparent",
+            hover_color="#171c22",
+            text_color="#c9ced6",
+            border_width=0,
+            border_color="#FF5722",
+        )
+        button.grid(row=row, column=0, sticky="ew", padx=14, pady=4)
+        self.nav_buttons[page_name] = button
+
+    def _update_nav_state(self, active_page):
+        for page_name, button in self.nav_buttons.items():
+            is_active = page_name == active_page
+            button.configure(
+                fg_color="#151b21" if is_active else "transparent",
+                hover_color="#202832" if is_active else "#171c22",
+                text_color="#ffffff" if is_active else "#c9ced6",
+                border_width=1 if is_active else 0,
+            )
     
     def _create_splash_overlay(self):
         """Cria o splash screen como Frame overlay"""
@@ -249,6 +350,8 @@ class IndutechproApp:
         # Mostrar página solicitada
         target_page.pack(fill="both", expand=True)
         self.current_page_name = page_name
+        self._update_nav_state(page_name)
+        self._schedule_style_refresh(target_page)
         
         # Apenas atualizar dados se:
         # 1. É um refresh forçado (primeira vez ou ação do utilizador)
@@ -262,6 +365,15 @@ class IndutechproApp:
                     target_page.refresh_data(force=True)
                 else:
                     target_page.refresh_data()
+            self._schedule_style_refresh(target_page)
+
+    def _schedule_style_refresh(self, page):
+        """Apply shared styling now and after async page refresh callbacks."""
+        for delay in (0, 120, 500):
+            try:
+                self.root.after(delay, lambda target=page: apply_modern_style(target))
+            except Exception:
+                pass
     
     def _on_focus_in(self, _):
         """
